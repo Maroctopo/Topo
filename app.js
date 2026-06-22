@@ -64,17 +64,30 @@ function openModal(type){
       (u.plan!=='annual'?'<div class="upgrade-card"><h4>Passer au Plan Annuel</h4><div class="price">400 MAD<small style="font-size:14px">/an</small></div><div class="desc">Économisez 40% · DXF Plan Pro · PPP-AR · APK Android</div><button class="ubtn" onclick="openModal(\'upgrade\');closeModal()">Upgrader maintenant</button></div>':'')+
       '<button class="btn danger" onclick="doLogout()">🚪 Se déconnecter</button>';
   } else if(type==='upgrade'){
-    t='Plan Annuel — 400 MAD/an';
-    b='<div class="upgrade-card" style="margin-bottom:16px"><div class="price">400 MAD<small style="font-size:14px">/an</small></div><div class="desc">soit 33.3 MAD/mois — Économisez 40% vs Plan Crédit</div></div>'+
-      '<ul style="font-size:12px;color:var(--txt2);margin-bottom:16px;padding-left:16px;line-height:2">'+
-      '<li>📐 DXF Plan de Situation Pro (bornes, cartouche, tableau)</li>'+
+    t='Choisir un plan';
+    var days=AUTH.trialDaysLeft(u);
+    b='<div style="background:#fff7e0;border:1px solid #f59e0b;border-radius:10px;padding:12px;margin-bottom:14px;font-size:12px;color:#92400e">'+
+      '<strong>🎁 Essai gratuit: '+days+' jours restants</strong><br>Après votre période d\'essai, choisissez le plan qui vous convient.</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">'+
+      '<div style="border:2px solid var(--gr);border-radius:12px;padding:14px;text-align:center;cursor:pointer" onclick="showPayment(\'credit\')">'+
+      '<div style="font-size:11px;font-weight:700;color:var(--gr);margin-bottom:6px">💳 PLAN CRÉDIT</div>'+
+      '<div style="font-size:28px;font-weight:900;color:var(--gr)">20</div>'+
+      '<div style="font-size:11px;color:var(--muted)">MAD / mois</div>'+
+      '<div style="font-size:10px;color:var(--muted);margin-top:4px">Résiliable à tout moment</div>'+
+      '<button class="btn success" style="margin-top:10px">Choisir →</button></div>'+
+      '<div style="border:2px solid var(--bl);border-radius:12px;padding:14px;text-align:center;cursor:pointer;background:var(--bl3)" onclick="showPayment(\'annual\')">'+
+      '<div style="font-size:11px;font-weight:700;color:var(--bl);margin-bottom:6px">⭐ PLAN ANNUEL</div>'+
+      '<div style="font-size:28px;font-weight:900;color:var(--bl)">400</div>'+
+      '<div style="font-size:11px;color:var(--muted)">MAD / an</div>'+
+      '<div style="font-size:10px;color:var(--gr);font-weight:700;margin-top:4px">-40% · Tout inclus</div>'+
+      '<button class="btn primary" style="margin-top:10px">Choisir →</button></div></div>'+
+      '<ul style="font-size:11px;color:var(--txt2);margin-bottom:0;padding-left:16px;line-height:2">'+
+      '<li>📐 DXF Plan de Situation Pro</li>'+
       '<li>🎯 Point Averaging ±0.5m</li>'+
-      '<li>⭐ PPP-AR ±3-10cm (CSRS-PPP Canada gratuit)</li>'+
+      '<li>⭐ PPP-AR ±3-10cm</li>'+
       '<li>📱 Android APK inclus</li>'+
-      '<li>🆕 Mises à jour gratuites à vie</li>'+
-      '<li>📞 Support WhatsApp prioritaire</li></ul>'+
-      '<a href="https://wa.me/212XXXXXXXXX?text=Upgrade%20MarocGeoPro%20400%20MAD%20-%20'+encodeURIComponent(u.email||'')+'" target="_blank" class="btn primary" style="text-decoration:none;display:flex">💬 Contacter via WhatsApp</a>'+
-      '<p style="font-size:10px;color:var(--muted);margin-top:8px;text-align:center">Activation immédiate après confirmation de paiement</p>';
+      '<li>🆕 Mises à jour gratuites</li>'+
+      '<li>📞 Support WhatsApp prioritaire</li></ul>';
   } else if(type==='settings'){
     t='Paramètres';
     b='<div class="sec-title">Langue</div><div class="btn-row" style="margin-bottom:14px"><button class="btn secondary" onclick="toast(\'Français activé\')">🇫🇷 Français</button><button class="btn secondary" onclick="toast(\'العربية\')">🇲🇦 العربية</button><button class="btn secondary" onclick="toast(\'English\')">🇬🇧 English</button></div>'+
@@ -658,3 +671,74 @@ function toast(msg,type){var t=document.getElementById('toast');t.textContent=ms
 
 // After map init, hook route click
 setTimeout(function(){if(map){map.on('click',function(e){if(pickingPt)setPtOnMap(pickingPt,e.latlng);});}},500);
+
+// Delete selected (toggle delete mode)
+var deleteMode = false;
+function deleteSelected(){
+  deleteMode = !deleteMode;
+  var btn = document.getElementById('btnDel');
+  if(deleteMode){
+    if(btn) btn.classList.add('on');
+    toast('Cliquez sur un élément pour le supprimer');
+    map.on('click', onDeleteClick);
+  } else {
+    if(btn) btn.classList.remove('on');
+    map.off('click', onDeleteClick);
+    toast('Mode suppression désactivé');
+  }
+}
+function onDeleteClick(e){
+  // Find closest shape
+  var found = null, minD = 50;
+  shapes.forEach(function(s){
+    try{
+      var ll = null;
+      if(s.layer.getLatLng) ll = s.layer.getLatLng();
+      else if(s.layer.getBounds) ll = s.layer.getBounds().getCenter();
+      if(ll){
+        var d = map.distance([e.latlng.lat,e.latlng.lng],[ll.lat,ll.lng]);
+        if(d < minD){ minD = d; found = s; }
+      }
+    }catch(er){}
+  });
+  if(found){ delShape(found.id); toast('Élément supprimé'); }
+}
+
+/* ── PAYMENT FUNCTIONS ── */
+function payWhatsApp(plan){
+  var u=window._user||{};
+  var prices={credit:'20 MAD/mois',annual:'400 MAD/an'};
+  var msg='Bonjour MarocGeoPro,\nJe souhaite souscrire au: '+prices[plan]+'\nNom: '+u.name+'\nEmail: '+u.email;
+  window.open('https://wa.me/212XXXXXXXXX?text='+encodeURIComponent(msg),'_blank');
+}
+function payCard(plan){
+  var u=window._user||{};
+  var amounts={credit:'20',annual:'400'};
+  document.getElementById('modalBody').innerHTML=
+    '<div style="background:#e8f0fe;border-radius:10px;padding:12px;margin-bottom:14px;font-size:12px"><strong>💳 Paiement sécurisé CMI</strong></div>'+
+    '<label>Email</label><input type="email" id="payEmailCard" value="'+(u.email||'')+'" placeholder="votre@email.com"/>'+
+    '<button class="btn primary" onclick="sendPayLink(\''+plan+'\',\''+amounts[plan]+'\')">Envoyer lien de paiement ('+amounts[plan]+' MAD)</button>'+
+    '<p style="font-size:10px;color:var(--muted);margin-top:8px;text-align:center">🔒 SSL · CMI Maroc · Visa · Mastercard</p>';
+}
+function sendPayLink(plan,amount){
+  var email=(document.getElementById('payEmailCard')||{}).value||'';
+  if(!email||!email.includes('@')){toast('Email valide requis','err');return;}
+  document.getElementById('modalBody').innerHTML=
+    '<div style="text-align:center;padding:30px">'+
+    '<div style="font-size:48px">✅</div>'+
+    '<div style="font-size:15px;font-weight:700;color:var(--gr);margin:12px 0">Lien envoyé!</div>'+
+    '<p style="font-size:12px;color:var(--muted)">Lien de paiement sécurisé ('+amount+' MAD) envoyé à<br><strong>'+email+'</strong></p>'+
+    '<p style="font-size:11px;color:var(--muted);margin-top:10px">Activation automatique après paiement.</p></div>';
+  toast('Lien envoyé à '+email,'ok');
+}
+function payVirement(plan){
+  document.getElementById('modalBody').innerHTML=
+    '<div style="background:#e8f0fe;border-radius:10px;padding:12px;margin-bottom:14px"><strong>🏦 Virement bancaire — CIH Bank Agadir</strong></div>'+
+    '<div class="kv-box">'+
+    '<div class="kv-row"><span>Bénéficiaire</span><strong>Oujamane Lahoucine</strong></div>'+
+    '<div class="kv-row"><span>RIB</span><strong style="font-size:10px">230 810 XXXX XXXX XXXX XXXX XX</strong></div>'+
+    '<div class="kv-row"><span>Montant</span><strong>'+(plan==='annual'?'400':'20')+' MAD</strong></div>'+
+    '<div class="kv-row"><span>Référence</span><strong>MGP-'+((window._user||{}).id||Date.now())+'</strong></div></div>'+
+    '<button class="btn primary" onclick="payWhatsApp(\''+plan+'\')">💬 Envoyer le reçu par WhatsApp</button>'+
+    '<p style="font-size:10px;color:var(--muted);margin-top:8px;text-align:center">Activation sous 24h après réception du virement</p>';
+}

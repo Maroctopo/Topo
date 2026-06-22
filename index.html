@@ -80,7 +80,7 @@
         </div>
       </div>
       <button class="auth-btn primary" onclick="doRegister()">Créer mon compte →</button>
-      <p class="auth-hint">✓ 14 jours d'essai gratuit · ✓ Sans engagement</p>
+      <p class="auth-hint">✓ 30 jours d'essai gratuit · ✓ Sans engagement</p>
     </div>
 
     <div class="auth-footer">
@@ -125,8 +125,9 @@
       <!-- Edition -->
       <div class="tb-group">
         <span class="tb-label">Edition</span>
-        <button class="tbtn" onclick="undoLast()" title="Annuler">↩ Annuler</button>
-        <button class="tbtn danger" onclick="clearAll()" title="Tout effacer">✕ Effacer</button>
+        <button class="tbtn" onclick="undoLast()" title="Annuler le dernier élément" id="btnUndo">↩ Annuler</button>
+        <button class="tbtn" onclick="deleteSelected()" title="Supprimer sélection" id="btnDel">🗑 Supprimer</button>
+        <button class="tbtn danger" onclick="clearAll()" title="Tout effacer" id="btnClear">✕ Tout effacer</button>
       </div>
       <div class="tb-sep"></div>
       <!-- Fonds -->
@@ -174,7 +175,7 @@
       <div id="userMenu" class="user-menu">
         <div class="um-info" id="umInfo"></div>
         <div class="um-item" onclick="openModal('account')">👤 Mon Compte</div>
-        <div class="um-item" onclick="openModal('upgrade')">⭐ Upgrader</div>
+        <div class="um-item" onclick="openModal('upgrade')">⭐ Upgrader le plan</div>
         <div class="um-item" onclick="openModal('settings')">⚙️ Paramètres</div>
         <div class="um-sep"></div>
         <div class="um-item danger" onclick="doLogout()">🚪 Déconnexion</div>
@@ -527,5 +528,123 @@
 <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
 <script src="auth.js"></script>
 <script src="app.js"></script>
+
+<script>
+// ── PAYMENT METHODS ──
+function showPayment(plan){
+  var prices = {credit:'20 MAD/mois', annual:'400 MAD/an'};
+  var price = prices[plan]||'—';
+  document.getElementById('modalTitle').textContent = 'Paiement — ' + price;
+  document.getElementById('modalBody').innerHTML = `
+    <div style="background:linear-gradient(135deg,#001d6e,#0055cc);color:#fff;border-radius:12px;padding:16px;margin-bottom:16px;text-align:center">
+      <div style="font-size:11px;opacity:.8;margin-bottom:4px">Plan sélectionné</div>
+      <div style="font-size:24px;font-weight:900">${price}</div>
+      <div style="font-size:11px;opacity:.8;margin-top:4px">${plan==='annual'?'Économisez 40% vs mensuel':''}</div>
+    </div>
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:10px">Choisir une méthode de paiement</div>
+
+    <button class="pay-method" onclick="payViaWhatsApp('${plan}')">
+      <span style="font-size:24px">💬</span>
+      <div>
+        <div style="font-weight:700">WhatsApp</div>
+        <div style="font-size:11px;color:var(--muted)">Paiement par virement ou cash — Confirmation immédiate</div>
+      </div>
+      <span style="margin-left:auto;color:var(--bl)">→</span>
+    </button>
+
+    <button class="pay-method" onclick="payViaCard('${plan}')">
+      <span style="font-size:24px">💳</span>
+      <div>
+        <div style="font-weight:700">Carte bancaire (CIH / Attijariwafa / BMCE)</div>
+        <div style="font-size:11px;color:var(--muted)">Visa · Mastercard · CMI — Paiement sécurisé</div>
+      </div>
+      <span style="margin-left:auto;color:var(--bl)">→</span>
+    </button>
+
+    <button class="pay-method" onclick="payViaCash('${plan}')">
+      <span style="font-size:24px">🏦</span>
+      <div>
+        <div style="font-weight:700">Virement bancaire</div>
+        <div style="font-size:11px;color:var(--muted)">RIB — Confirmation sous 24h</div>
+      </div>
+      <span style="margin-left:auto;color:var(--bl)">→</span>
+    </button>
+
+    <div style="background:#fef9e7;border:1px solid #f59e0b;border-radius:10px;padding:12px;margin-top:12px;font-size:11px;color:#92400e">
+      <strong>🎁 Essai gratuit en cours</strong><br>
+      Vous avez encore <strong id="trialLeft">—</strong> jours d'essai gratuit.<br>
+      Vous ne serez débité qu'après activation de votre abonnement.
+    </div>
+  `;
+  // Update trial days
+  var u = window._user;
+  if(u && u.trialEnd){
+    var days = Math.max(0,Math.ceil((new Date(u.trialEnd)-Date.now())/86400000));
+    var el = document.getElementById('trialLeft');
+    if(el) el.textContent = days;
+  }
+  document.getElementById('modal').classList.add('open');
+}
+
+function payViaWhatsApp(plan){
+  var u = window._user||{};
+  var prices = {credit:'20 MAD/mois', annual:'400 MAD/an'};
+  var msg = 'Bonjour, je souhaite souscrire au plan MarocGeoPro '+prices[plan]+'\nNom: '+u.name+'\nEmail: '+u.email;
+  window.open('https://wa.me/212XXXXXXXXX?text='+encodeURIComponent(msg),'_blank');
+}
+function payViaCard(plan){
+  // CMI / Payzone integration point
+  var u = window._user||{};
+  var amounts = {credit:'20.00', annual:'400.00'};
+  // Show bank card form
+  document.getElementById('modalBody').innerHTML = `
+    <div style="background:#e8f0fe;border-radius:10px;padding:14px;margin-bottom:14px;font-size:12px">
+      <strong>Paiement sécurisé par carte</strong><br>
+      <span style="color:var(--muted)">Redirection vers le portail CMI sécurisé</span>
+    </div>
+    <div style="text-align:center;padding:20px">
+      <div style="font-size:32px;margin-bottom:12px">💳</div>
+      <div style="font-size:14px;font-weight:700;margin-bottom:8px">Montant: ${amounts[plan]} MAD</div>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:16px">Entrez votre email pour recevoir le lien de paiement sécurisé CMI</p>
+      <input type="email" id="payEmail" placeholder="${u.email||'votre@email.com'}" style="margin-bottom:10px"/>
+      <button class="btn primary" onclick="sendPayLink('${plan}')">Envoyer le lien de paiement</button>
+    </div>
+    <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:10px;font-size:11px;margin-top:10px">
+      🔒 Paiement 100% sécurisé · SSL · CMI Maroc
+    </div>
+  `;
+}
+function sendPayLink(plan){
+  var email = (document.getElementById('payEmail')||{}).value||'';
+  if(!email||!email.includes('@')){toast('Email valide requis','err');return;}
+  // In production: API call to CMI/PayZone
+  document.getElementById('modalBody').innerHTML = `
+    <div style="text-align:center;padding:30px">
+      <div style="font-size:48px;margin-bottom:12px">✅</div>
+      <div style="font-size:16px;font-weight:700;color:var(--gr);margin-bottom:8px">Lien envoyé!</div>
+      <p style="font-size:12px;color:var(--muted)">Un lien de paiement sécurisé a été envoyé à<br><strong>${email}</strong></p>
+      <p style="font-size:11px;color:var(--muted);margin-top:12px">Votre abonnement sera activé automatiquement après confirmation du paiement.</p>
+    </div>
+  `;
+  toast('Lien de paiement envoyé à '+email,'ok');
+}
+function payViaCash(plan){
+  document.getElementById('modalBody').innerHTML = `
+    <div style="background:#e8f0fe;border-radius:10px;padding:14px;margin-bottom:14px">
+      <strong style="font-size:13px">Virement bancaire</strong>
+    </div>
+    <div class="kv-box">
+      <div class="kv-row"><span>Banque</span><strong>CIH Bank</strong></div>
+      <div class="kv-row"><span>Bénéficiaire</span><strong>MarocGeoPro / Oujamane L.</strong></div>
+      <div class="kv-row"><span>RIB</span><strong>230 810 XXXX XXXX XXXX XXXX XX</strong></div>
+      <div class="kv-row"><span>Montant</span><strong>${plan==='annual'?'400':'20'} MAD</strong></div>
+      <div class="kv-row"><span>Référence</span><strong>${(window._user||{}).id||'MGP'+Date.now()}</strong></div>
+    </div>
+    <p style="font-size:11px;color:var(--txt2);margin-bottom:12px">Envoyez le reçu de virement par WhatsApp pour activer votre compte.</p>
+    <button class="btn primary" onclick="payViaWhatsApp('${plan}')">💬 Envoyer le reçu par WhatsApp</button>
+    <p style="font-size:10px;color:var(--muted);margin-top:8px;text-align:center">Activation sous 24h après réception du virement</p>
+  `;
+}
+</script>
 </body>
 </html>

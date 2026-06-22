@@ -32,7 +32,7 @@ var AUTH = (function(){
       pass: btoa(pass), plan: plan||'credit',
       createdAt: new Date().toISOString(),
       lastLogin: new Date().toISOString(),
-      trialEnd: new Date(Date.now()+14*86400000).toISOString(),
+      trialEnd: new Date(Date.now()+30*86400000).toISOString(),
       projectCount: 0, exportCount: 0
     };
     users.push(user);
@@ -44,7 +44,7 @@ var AUTH = (function(){
   function demo(){
     return {
       id:'demo', name:'Mode Démo', email:'demo@marocgeopro.ma',
-      plan:'demo', trialEnd: new Date(Date.now()+14*86400000).toISOString(),
+      plan:'demo', trialEnd: new Date(Date.now()+30*86400000).toISOString(),
       projectCount:0, exportCount:0
     };
   }
