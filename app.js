@@ -219,12 +219,23 @@ function addPtCoords(){
   var lat=parseFloat(document.getElementById('ptLat').value);
   var lon=parseFloat(document.getElementById('ptLon').value);
   var nm=document.getElementById('ptName').value||'Point';
-  if(isNaN(lat)||isNaN(lon)){toast('Coordonnées invalides','err');return;}
+  if(isNaN(lat)||isNaN(lon)){toast('Coordonnées invalides — vérifiez Lat/Lon','err');return;}
+  if(lat<-90||lat>90){toast('Latitude invalide (doit être entre -90 et 90)','err');return;}
+  if(lon<-180||lon>180){toast('Longitude invalide (doit être entre -180 et 180)','err');return;}
   var c=document.getElementById('col').value||'#0055cc';
-  var m=L.circleMarker([lat,lon],{radius:7,color:c,fillColor:c,fillOpacity:1,weight:2}).addTo(drawn);
-  m.bindPopup('<b>'+nm+'</b><br>'+lat.toFixed(8)+'<br>'+lon.toFixed(8));
+  // Create visible marker
+  var m=L.circleMarker([lat,lon],{radius:9,color:c,fillColor:c,fillOpacity:1,weight:3}).addTo(drawn);
+  m.bindPopup(
+    '<b>📍 '+nm+'</b><br>'+
+    'Lat: <b>'+lat.toFixed(8)+'</b><br>'+
+    'Lon: <b>'+lon.toFixed(8)+'</b>'
+  ).openPopup();
   regShape(m,'marker',{name:nm,lat:lat,lon:lon},c);
-  map.setView([lat,lon],15);toast('Point ajouté','ok');
+  // Center map with animation
+  map.flyTo([lat,lon],16,{duration:1.2});
+  // Clear inputs
+  document.getElementById('ptName').value='';
+  toast('Point "'+nm+'" ajouté sur la carte','ok');
 }
 
 // ── GEOMETRY ──
@@ -333,10 +344,27 @@ function doConvert(){
     document.getElementById('convR1').textContent=out[0];
     document.getElementById('convR2').textContent=out[1];
     document.getElementById('convWGS').textContent=lat.toFixed(8)+'°, '+lon.toFixed(8)+'°';
-    cr.classList.add('show');toast('Converti ✓','ok');
+    cr.classList.add('show');
+    // Show marker on map automatically
+    if(window._convMarker){map.removeLayer(window._convMarker);}
+    var cIcon=L.divIcon({className:'',
+      html:'<div style="width:18px;height:18px;border-radius:50%;background:#c87800;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.5)"></div>',
+      iconSize:[18,18],iconAnchor:[9,9]
+    });
+    window._convMarker=L.marker([lat,lon],{icon:cIcon,zIndexOffset:800}).addTo(map);
+    window._convMarker.bindPopup(
+      '<b>🔄 Point converti</b><br>'+out[0]+'<br>'+out[1]+'<br><small>'+lat.toFixed(8)+', '+lon.toFixed(8)+'</small>'
+    ).openPopup();
+    map.flyTo([lat,lon],15,{duration:1.0});
+    toast('Converti et affiché sur la carte ✓','ok');
   }catch(e){ce.textContent='⚠ '+e.message;ce.classList.add('show');toast('Erreur','err');}
 }
-function locateConverted(){if(!lastWGS){toast('Convertir d\'abord','err');return;}map.setView([lastWGS.lat,lastWGS.lon],15);}
+function locateConverted(){
+  if(!lastWGS){toast('Convertir d\'abord','err');return;}
+  map.flyTo([lastWGS.lat,lastWGS.lon],16,{duration:1.0});
+  if(window._convMarker)window._convMarker.openPopup();
+  toast('Centré sur le point converti','ok');
+}
 function copyConv(){if(!lastWGS)return;navigator.clipboard.writeText([document.getElementById('convR1').textContent,document.getElementById('convR2').textContent,document.getElementById('convWGS').textContent].join('\n')).then(()=>toast('Copié','ok'));}
 function doBatch(){
   var src=document.getElementById('srcCRS').value,dst=document.getElementById('dstCRS').value;
@@ -355,7 +383,10 @@ function plotBatch(){
   if(!batchWGS.length){toast('Convertir d\'abord','err');return;}
   var c=document.getElementById('col').value;
   batchWGS.forEach(function(ll,i){var m=L.circleMarker(ll,{radius:5,color:c,fillColor:c,fillOpacity:1}).addTo(drawn);regShape(m,'marker',{name:'Lot '+(i+1),lat:ll[0],lon:ll[1]},c);});
-  if(batchWGS.length)map.fitBounds(L.latLngBounds(batchWGS));toast(batchWGS.length+' tracés','ok');
+  if(batchWGS.length){
+    map.flyToBounds(L.latLngBounds(batchWGS),{padding:[40,40],duration:1.2});
+    toast(batchWGS.length+' points tracés sur la carte','ok');
+  }
 }
 
 // ── MEASURES ──
@@ -366,8 +397,63 @@ function getAlt(){
   document.getElementById('elvVal').textContent='Chargement...';
   fetch('https://api.open-elevation.com/api/v1/lookup?locations='+lat+','+lon).then(r=>r.json()).then(d=>{document.getElementById('elvVal').textContent=d.results[0].elevation+' m';}).catch(()=>{document.getElementById('elvVal').textContent='Service indisponible';});
 }
-function gotoCoords(){var c=prompt('Lat,Lon (ex: 29.37,-10.05):');if(!c)return;var p=c.split(',');if(p.length<2)return;var lat=parseFloat(p[0]),lon=parseFloat(p[1]);if(isNaN(lat)||isNaN(lon))return;map.setView([lat,lon],15);}
-function locateMe(){navigator.geolocation.getCurrentPosition(function(pos){map.setView([pos.coords.latitude,pos.coords.longitude],17);toast('Position trouvée','ok');},function(e){toast('GPS: '+e.message,'err');},{enableHighAccuracy:true,timeout:15000});}
+function gotoCoords(){
+  var c=prompt('Entrez Lat,Lon (ex: 29.37,-10.05) ou coordonnées Lambert:');
+  if(!c)return;
+  var p=c.trim().split(/[,;\s]+/);
+  if(p.length<2){toast('Format: Lat,Lon','err');return;}
+  var lat=parseFloat(p[0]),lon=parseFloat(p[1]);
+  if(isNaN(lat)||isNaN(lon)){toast('Coordonnées invalides','err');return;}
+  map.flyTo([lat,lon],16,{duration:1.2});
+  if(window._gotoMarker)map.removeLayer(window._gotoMarker);
+  var icon=L.divIcon({className:'',
+    html:'<div style="width:16px;height:16px;border-radius:50%;background:#c87800;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.5)"></div>',
+    iconSize:[16,16],iconAnchor:[8,8]
+  });
+  window._gotoMarker=L.marker([lat,lon],{icon:icon,zIndexOffset:700}).addTo(map);
+  window._gotoMarker.bindPopup('<b>🔍 Point recherché</b><br>'+lat.toFixed(8)+', '+lon.toFixed(8)).openPopup();
+  toast('Navigation: '+lat.toFixed(5)+', '+lon.toFixed(5),'ok');
+}
+function locateMe(){
+  if(!navigator.geolocation){toast('GPS indisponible sur cet appareil','err');return;}
+  toast('Localisation en cours...');
+  navigator.geolocation.getCurrentPosition(
+    function(pos){
+      var lat=pos.coords.latitude, lon=pos.coords.longitude, acc=pos.coords.accuracy||0;
+      // Center map
+      map.setView([lat,lon],17);
+      // Remove old locate marker if exists
+      if(window._locateMarker){map.removeLayer(window._locateMarker);window._locateMarker=null;}
+      if(window._locateCircle){map.removeLayer(window._locateCircle);window._locateCircle=null;}
+      // Accuracy circle
+      window._locateCircle=L.circle([lat,lon],{
+        radius:acc,color:'#0055cc',fillColor:'#0055cc',fillOpacity:0.08,weight:1,dashArray:'4,4'
+      }).addTo(map);
+      // Position marker
+      var icon=L.divIcon({className:'',
+        html:'<div style="position:relative"><div style="width:20px;height:20px;border-radius:50%;background:#0055cc;border:3px solid #fff;box-shadow:0 0 0 4px rgba(0,85,204,0.25),0 2px 8px rgba(0,0,0,0.4)"></div></div>',
+        iconSize:[20,20],iconAnchor:[10,10]
+      });
+      window._locateMarker=L.marker([lat,lon],{icon:icon,zIndexOffset:900}).addTo(map);
+      window._locateMarker.bindPopup(
+        '<b>📡 Ma position GPS</b><br>'+
+        'Lat: <b>'+lat.toFixed(8)+'</b><br>'+
+        'Lon: <b>'+lon.toFixed(8)+'</b><br>'+
+        'Précision: ±'+acc.toFixed(0)+'m<br>'+
+        '<small style="color:#666">'+new Date().toLocaleTimeString()+'</small>'
+      ).openPopup();
+      // Update input fields for easy use
+      var el=document.getElementById('elvLat');if(el)el.value=lat.toFixed(6);
+      var eo=document.getElementById('elvLon');if(eo)eo.value=lon.toFixed(6);
+      toast('Position: ±'+acc.toFixed(0)+'m','ok');
+    },
+    function(e){
+      var msgs={1:'Permission refusée — autorisez la localisation dans le navigateur',2:'Signal GPS indisponible',3:'Délai dépassé — réessayez en extérieur'};
+      toast(msgs[e.code]||e.message,'err');
+    },
+    {enableHighAccuracy:true,timeout:20000,maximumAge:5000}
+  );
+}
 function calcDist(){
   var a=[parseFloat(document.getElementById('dAl').value),parseFloat(document.getElementById('dAo').value)];
   var b=[parseFloat(document.getElementById('dBl').value),parseFloat(document.getElementById('dBo').value)];
@@ -416,7 +502,24 @@ function finishAvg(samples){
   document.getElementById('avgAcc').textContent='±'+std.toFixed(3)+'m ('+samples.length+' mesures)';
   toast('Moyenne: ±'+std.toFixed(3)+'m','ok');
 }
-function saveAvg(){if(!_lastAvg)return;var c='#00884d';var m=L.circleMarker([_lastAvg.lat,_lastAvg.lon],{radius:8,color:c,fillColor:c,fillOpacity:1}).addTo(drawn);m.bindPopup('<b>Avg</b><br>±'+_lastAvg.std.toFixed(3)+'m');regShape(m,'marker',{name:'Point Moyenné',lat:_lastAvg.lat,lon:_lastAvg.lon},c);map.setView([_lastAvg.lat,_lastAvg.lon],17);toast('Sauvegardé','ok');}
+function saveAvg(){
+  if(!_lastAvg)return;
+  var c='#00884d';
+  var m=L.circleMarker([_lastAvg.lat,_lastAvg.lon],{
+    radius:10,color:c,fillColor:c,fillOpacity:1,weight:3
+  }).addTo(drawn);
+  m.bindPopup(
+    '<b>🎯 Point Moyenné</b><br>'+
+    'Lat: <b>'+_lastAvg.lat.toFixed(8)+'</b><br>'+
+    'Lon: <b>'+_lastAvg.lon.toFixed(8)+'</b><br>'+
+    'Alt: <b>'+_lastAvg.alt.toFixed(2)+'m</b><br>'+
+    'Précision: <b>±'+_lastAvg.std.toFixed(3)+'m</b><br>'+
+    'Mesures: <b>'+_lastAvg.n+'</b>'
+  ).openPopup();
+  regShape(m,'marker',{name:'Point Moyenné (±'+_lastAvg.std.toFixed(2)+'m)',lat:_lastAvg.lat,lon:_lastAvg.lon},c);
+  map.flyTo([_lastAvg.lat,_lastAvg.lon],17,{duration:1.2});
+  toast('Point moyenné affiché sur la carte ✓','ok');
+}
 function copyAvg(){if(!_lastAvg)return;navigator.clipboard.writeText('Lat:'+_lastAvg.lat.toFixed(8)+'\nLon:'+_lastAvg.lon.toFixed(8)+'\n±'+_lastAvg.std.toFixed(3)+'m').then(()=>toast('Copié','ok'));}
 
 // ── GPS TEMPS RÉEL ──
