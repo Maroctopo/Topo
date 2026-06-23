@@ -153,11 +153,11 @@ function updatePtLabels(){
   document.getElementById('ptDMSFields').style.display = isDMS ? 'block' : 'none';
   document.getElementById('ptDDFields').style.display = isDMS ? 'none' : 'block';
   if(!isDMS){
-    document.getElementById('ptLbl1').textContent = geo ? 'Latitude (DD)' : 'Y — Northing (m)';
-    document.getElementById('ptLbl2').textContent = geo ? 'Longitude (DD)' : 'X — Easting (m)';
-    document.getElementById('ptLat').placeholder = geo ? '29.370000' : '3246000';
-    document.getElementById('ptLon').placeholder = geo ? '-10.050000' : '500000';
-    // Update step
+    // X (Easting) first = ptLat field, Y (Northing) second = ptLon field
+    document.getElementById('ptLbl1').textContent = geo ? 'Latitude (DD)' : 'X — Easting (m)';
+    document.getElementById('ptLbl2').textContent = geo ? 'Longitude (DD)' : 'Y — Northing (m)';
+    document.getElementById('ptLat').placeholder = geo ? '29.370000' : '500000';
+    document.getElementById('ptLon').placeholder = geo ? '-10.050000' : '3246000';
     document.getElementById('ptLat').step = geo ? '0.000001' : '1';
     document.getElementById('ptLon').step = geo ? '0.000001' : '1';
   }
@@ -187,8 +187,8 @@ function previewPtWGS(){
       lat=parseFloat(document.getElementById('ptLat').value);
       lon=parseFloat(document.getElementById('ptLon').value);
     } else {
-      var x=parseFloat(document.getElementById('ptLon').value); // X=Easting
-      var y=parseFloat(document.getElementById('ptLat').value); // Y=Northing
+      var x=parseFloat(document.getElementById('ptLat').value); // X=Easting (premier)
+      var y=parseFloat(document.getElementById('ptLon').value); // Y=Northing (deuxième)
       if(isNaN(x)||isNaN(y)) throw new Error();
       var r=tw(c,x,y);lon=r[0];lat=r[1];
     }
@@ -324,7 +324,7 @@ function addPtCoords(){
   if(crsCode==='DMS'){
     origCoords='DMS: '+document.getElementById('ptLatD').value+'° '+document.getElementById('ptLatM').value+"' "+document.getElementById('ptLatS').value+'" '+document.getElementById('ptLatDir').value+'<br>';
   } else if(!isGeo(crsCode)){
-    origCoords=crsCode+': X='+document.getElementById('ptLon').value+' Y='+document.getElementById('ptLat').value+'<br>';
+    origCoords=crsCode+'  X='+document.getElementById('ptLat').value+' / Y='+document.getElementById('ptLon').value+'<br>';
   }
   var m=L.circleMarker([lat,lon],{radius:10,color:color,fillColor:color,fillOpacity:1,weight:3}).addTo(drawn);
   m.bindPopup(
@@ -421,7 +421,7 @@ function buildSrcFields(){
   document.getElementById('convErr').classList.remove('show');
   if(c==='DMS'){el.innerHTML='<div class="two-col" style="margin-bottom:5px"><div><label>Lat °</label><input type="number" id="latD" placeholder="29" style="margin-bottom:0"/></div><div><label>Min</label><input type="number" id="latM" placeholder="22" style="margin-bottom:0"/></div></div><div class="two-col" style="margin-bottom:5px"><div><label>Sec</label><input type="number" id="latS" placeholder="12" style="margin-bottom:0"/></div><div><label>Dir</label><select id="latDir" style="margin-bottom:0"><option>N</option><option>S</option></select></div></div><div class="two-col" style="margin-bottom:5px"><div><label>Lon °</label><input type="number" id="lonD" placeholder="10" style="margin-bottom:0"/></div><div><label>Min</label><input type="number" id="lonM" placeholder="3" style="margin-bottom:0"/></div></div><div class="two-col"><div><label>Sec</label><input type="number" id="lonS" placeholder="0" style="margin-bottom:0"/></div><div><label>Dir</label><select id="lonDir" style="margin-bottom:0"><option>E</option><option>W</option></select></div></div>';}
   else if(c==='DD'){el.innerHTML='<div class="two-col"><div><label>Latitude</label><input type="number" id="srcLat" placeholder="29.37" step="0.00000001" style="margin-bottom:0"/></div><div><label>Longitude</label><input type="number" id="srcLon" placeholder="-10.05" step="0.00000001" style="margin-bottom:0"/></div></div>';}
-  else{el.innerHTML='<div class="two-col"><div><label>X Easting (m)</label><input type="number" id="srcX" placeholder="500000" style="margin-bottom:0"/></div><div><label>Y Northing (m)</label><input type="number" id="srcY" placeholder="3246000" style="margin-bottom:0"/></div></div>';}
+  else{el.innerHTML='<div class="two-col"><div><label>X — Easting (m)</label><input type="number" id="srcX" placeholder="500000" style="margin-bottom:0"/></div><div><label>Y — Northing (m)</label><input type="number" id="srcY" placeholder="3246000" style="margin-bottom:0"/></div></div>';}
 }
 buildSrcFields();
 
@@ -479,6 +479,8 @@ function doBatch(){
   batchWGS=[];var out=[];
   lines.forEach(function(line,i){
     if(!line.trim())return;var p=line.trim().split(/[,;\t ]+/);if(p.length<2)return;
+    // X (Easting) = p[0], Y (Northing) = p[1] pour systèmes projetés
+    // Lat = p[0], Lon = p[1] pour WGS84 DD
     var x=parseFloat(p[0]),y=parseFloat(p[1]);if(isNaN(x)||isNaN(y))return;
     try{var lon,lat;if(isGeo(src)){lat=x;lon=y;}else{var r=tw(src,x,y);lon=r[0];lat=r[1];}
     batchWGS.push([lat,lon]);var s;if(isGeo(dst)){s=lat.toFixed(8)+','+lon.toFixed(8);}else{var r2=fw(dst,lon,lat);s=r2[0].toFixed(4)+','+r2[1].toFixed(4);}out.push(s);}catch(e){out.push('ERR');}
@@ -521,8 +523,8 @@ function openGotoModal(){
     '<div class="two-col"><div><label>Sec</label><input type="number" id="gLonS" placeholder="8.4" style="margin-bottom:8px"/></div><div><label>Dir</label><select id="gLonDir"><option>E</option><option>W</option></select></div></div>'+
     '</div>'+
     '<div id="gDDFields">'+
-    '<label id="gLbl1">Latitude (DD)</label><input type="number" id="gLat" placeholder="29.370000" step="0.000001" style="margin-bottom:6px"/>'+
-    '<label id="gLbl2">Longitude (DD)</label><input type="number" id="gLon" placeholder="-10.050000" step="0.000001" style="margin-bottom:8px"/>'+
+    '<label id="gLbl1">X — Easting (m) / Latitude (DD)</label><input type="number" id="gLat" placeholder="29.370000 ou 500000" step="0.000001" style="margin-bottom:6px"/>'+
+    '<label id="gLbl2">Y — Northing (m) / Longitude (DD)</label><input type="number" id="gLon" placeholder="-10.050000 ou 3246000" step="0.000001" style="margin-bottom:8px"/>'+
     '</div>'+
     '<div id="gPreview" style="font:11px monospace;color:var(--muted);background:var(--surf);border-radius:7px;padding:6px 8px;margin-bottom:10px;display:none">WGS84: —</div>'+
     '<button class="btn primary" onclick="doGoto()">📍 Aller à ce point</button>';
@@ -543,10 +545,10 @@ function updateGotoFields(){
   document.getElementById('gDMSFields').style.display=isDMS?'block':'none';
   document.getElementById('gDDFields').style.display=isDMS?'none':'block';
   if(!isDMS){
-    document.getElementById('gLbl1').textContent=geo?'Latitude (DD)':'Y — Northing (m)';
-    document.getElementById('gLbl2').textContent=geo?'Longitude (DD)':'X — Easting (m)';
-    document.getElementById('gLat').placeholder=geo?'29.370000':'3246000';
-    document.getElementById('gLon').placeholder=geo?'-10.050000':'500000';
+    document.getElementById('gLbl1').textContent=geo?'Latitude (DD)':'X — Easting (m)';
+    document.getElementById('gLbl2').textContent=geo?'Longitude (DD)':'Y — Northing (m)';
+    document.getElementById('gLat').placeholder=geo?'29.370000':'500000';
+    document.getElementById('gLon').placeholder=geo?'-10.050000':'3246000';
   }
 }
 function previewGoto(){
@@ -569,8 +571,8 @@ function previewGoto(){
       lat=parseFloat(document.getElementById('gLat').value);
       lon=parseFloat(document.getElementById('gLon').value);
     } else {
-      var X=parseFloat(document.getElementById('gLon').value);
-      var Y=parseFloat(document.getElementById('gLat').value);
+      var X=parseFloat(document.getElementById('gLat').value); // X Easting premier
+      var Y=parseFloat(document.getElementById('gLon').value); // Y Northing deuxième
       if(isNaN(X)||isNaN(Y))throw new Error();
       var r=tw(c,X,Y);lon=r[0];lat=r[1];
     }
@@ -603,9 +605,9 @@ function doGoto(){
       lon=parseFloat(document.getElementById('gLon').value);
       if(isNaN(lat)||isNaN(lon))throw new Error('Lat et Lon requis');
     }else{
-      var X=parseFloat(document.getElementById('gLon').value);
-      var Y=parseFloat(document.getElementById('gLat').value);
-      if(isNaN(X)||isNaN(Y))throw new Error('X et Y requis');
+      var X=parseFloat(document.getElementById('gLat').value); // X Easting = premier champ
+      var Y=parseFloat(document.getElementById('gLon').value); // Y Northing = deuxième champ
+      if(isNaN(X)||isNaN(Y))throw new Error('X (Easting) et Y (Northing) requis');
       var r=tw(c,X,Y);lon=r[0];lat=r[1];
     }
     if(Math.abs(lat)>90||Math.abs(lon)>180)throw new Error('Hors limites');
@@ -893,8 +895,24 @@ function expGeoJSON(){
 }
 function expCSV(){
   if(!shapes.length){toast('Aucun élément','err');return;}
-  var csv='type,nom,lat,lon\n';
-  shapes.forEach(function(s){if(s.type==='marker'){var p=s.layer.getLatLng();csv+=s.type+','+(s.info.name||'')+','+p.lat.toFixed(8)+','+p.lng.toFixed(8)+'\n';}});
+  var code=document.getElementById('qCRS').value;
+  var isGeoCode=isGeo(code);
+  var csv=isGeoCode?'type,nom,lat,lon\n':'type,nom,X_Easting,Y_Northing,lat_wgs84,lon_wgs84\n';
+  shapes.forEach(function(s){
+    if(s.type==='marker'){
+      var p=s.layer.getLatLng();
+      if(isGeoCode){
+        csv+=s.type+','+(s.info.name||'')+','+p.lat.toFixed(8)+','+p.lng.toFixed(8)+'\n';
+      } else {
+        try{
+          var r=fw(code,p.lng,p.lat);
+          csv+=s.type+','+(s.info.name||'')+','+r[0].toFixed(3)+','+r[1].toFixed(3)+','+p.lat.toFixed(8)+','+p.lng.toFixed(8)+'\n';
+        }catch(e){
+          csv+=s.type+','+(s.info.name||'')+','+p.lat.toFixed(8)+','+p.lng.toFixed(8)+'\n';
+        }
+      }
+    }
+  });
   dlFile(csv,'export.csv','text/csv');toast('CSV exporté','ok');
 }
 function expGPX(){

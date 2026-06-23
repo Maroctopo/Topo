@@ -259,10 +259,10 @@
             </div>
           </div>
           <div id="ptDDFields">
-            <label id="ptLbl1">Latitude (DD)</label>
-            <input type="number" id="ptLat" placeholder="29.370000" step="0.000001"/>
-            <label id="ptLbl2">Longitude (DD)</label>
-            <input type="number" id="ptLon" placeholder="-10.050000" step="0.000001"/>
+            <label id="ptLbl1">X — Easting (m) / Latitude (DD)</label>
+            <input type="number" id="ptLat" placeholder="29.370000 ou 500000" step="0.000001"/>
+            <label id="ptLbl2">Y — Northing (m) / Longitude (DD)</label>
+            <input type="number" id="ptLon" placeholder="-10.050000 ou 3246000" step="0.000001"/>
           </div>
           <input type="text" id="ptName" placeholder="Nom du point (optionnel)"/>
           <div id="ptWGSPreview" style="font:11px monospace;color:var(--muted);padding:5px 8px;background:var(--surf);border-radius:7px;margin-bottom:7px;display:none">WGS84: —</div>
@@ -327,16 +327,17 @@
           </div>
           <div class="err-box" id="convErr"></div>
           <div class="result-box" id="convRes">
-            <div class="rl">Résultat</div>
+            <div class="rl">X (Easting) / Latitude ↓</div>
             <div class="rv" id="convR1">—</div>
+            <div class="rl" style="margin-top:4px">Y (Northing) / Longitude ↓</div>
             <div class="rv" id="convR2">—</div>
             <div class="rl" style="margin-top:6px">WGS84 (référence)</div>
             <div class="rv" id="convWGS">—</div>
             <button class="btn secondary sm" onclick="copyConv()" style="margin-top:8px">📋 Copier</button>
           </div>
           <div class="sec-title" style="margin-top:14px">Conversion en lot</div>
-          <p class="hint">Une paire X,Y par ligne</p>
-          <textarea id="batchIn" rows="4" placeholder="500000,3246000&#10;500500,3246800"></textarea>
+          <p class="hint">Une paire X,Y par ligne (ou Lat,Lon pour WGS84)</p>
+          <textarea id="batchIn" rows="4" placeholder="X,Y (ex: 500000,3246000)&#10;500500,3246800&#10;ou Lat,Lon pour WGS84"></textarea>
           <div class="btn-row">
             <button class="btn secondary sm" onclick="doBatch()">Convertir</button>
             <button class="btn secondary sm" onclick="dlBatch()">⬇ CSV</button>
